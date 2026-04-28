@@ -1,0 +1,30 @@
+# Android build artifacts
+**/build/
+*.apk
+*.aar
+*.ap_
+*.dex
+
+# Kotlin/Gradle
+.gradle/
+build/
+.kotlin/
+*.class
+*.klib
+*.salive
+
+# IDE - Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# OS Specific
+.DS_Store
+Thumbs.db
+
+# Secrets
+google-services.json
