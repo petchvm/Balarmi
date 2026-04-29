@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Balarmi</string>
+    <string name="app_title_decorated">Balarmi ヾ(≧▽≦*)o</string>
 
     <!-- Notification channels -->
     <string name="channel_alarm_name">Battery Alarm</string>
@@ -9,39 +10,42 @@
     <string name="channel_monitor_desc">Persistent notification while monitoring battery during charging</string>
 
     <!-- Foreground notification -->
-    <string name="monitor_notification_title">Balarmi is monitoring</string>
+    <string name="monitor_notification_title">Balarmi</string>
     <string name="monitor_notification_text_charging">Watching for %1$d%% — currently %2$d%%</string>
     <string name="monitor_notification_text_idle">Waiting for charger…</string>
+    <string name="notification_action_stop">Stop</string>
 
     <!-- Alarm notification (full-screen intent fallback) -->
     <string name="alarm_notification_title">Battery at %1$d%% — unplug now</string>
     <string name="alarm_notification_text">Tap to open Balarmi alarm</string>
 
     <!-- Settings UI -->
-    <string name="settings_enable">Enable monitoring</string>
-    <string name="settings_enable_desc">Master switch — turn on to start watching battery</string>
     <string name="settings_threshold">Alarm at</string>
-    <string name="settings_mode">Service mode</string>
-    <string name="settings_mode_charging_only">Charging only</string>
-    <string name="settings_mode_charging_only_desc">Service runs only while plugged in. Cleaner, but vivo may kill the receiver.</string>
-    <string name="settings_mode_always_on">Always on</string>
-    <string name="settings_mode_always_on_desc">Persistent notification, most reliable on vivo.</string>
     <string name="settings_vibrate">Vibrate</string>
     <string name="settings_ringtone">Alarm sound</string>
     <string name="settings_ringtone_default">System default alarm</string>
     <string name="settings_test">Test alarm</string>
 
-    <!-- Setup checklist -->
-    <string name="checklist_title">Setup checklist</string>
-    <string name="checklist_subtitle">Complete these so the alarm reliably fires</string>
+    <!-- Hero card -->
+    <string name="hero_charging">Charging</string>
+    <string name="hero_not_charging">Not charging</string>
+    <string name="hero_will_alarm_at">Will alarm at %1$d%%</string>
+    <string name="hero_battery_unknown">— %%</string>
+    <string name="hero_battery_pct">%1$d%%</string>
+
+    <!-- Setup banner -->
+    <string name="setup_banner_title">Set up Balarmi</string>
+    <string name="setup_banner_subtitle">%1$d of %2$d done</string>
+    <string name="setup_banner_collapse">Hide</string>
     <string name="checklist_notifications">Allow notifications</string>
     <string name="checklist_full_screen">Allow full-screen alarms</string>
     <string name="checklist_battery_opt">Disable battery optimization</string>
-    <string name="checklist_vivo_autostart">Allow auto-start (vivo iManager)</string>
-    <string name="checklist_lock_recents">Lock Balarmi in Recent Apps</string>
-    <string name="checklist_lock_recents_desc">Open the Recent Apps view, swipe down on the Balarmi card and tap the lock icon. Prevents vivo from killing it.</string>
     <string name="checklist_grant">Open settings</string>
-    <string name="checklist_done">Done</string>
+
+    <!-- Reliability tips expander -->
+    <string name="tips_title">Reliability tips</string>
+    <string name="tips_lock_recents_title">Lock Balarmi in Recent Apps</string>
+    <string name="tips_lock_recents_desc">Open the Recent Apps view, swipe down on the Balarmi card and tap the lock icon. Helps prevent the OS from killing the app while charging.</string>
 
     <!-- Alarm screen -->
     <string name="alarm_screen_battery_full">Battery at %1$d%%</string>

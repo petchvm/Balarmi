@@ -8,13 +8,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
-    <queries>
-        <package android:name="com.iqoo.secure" />
-        <package android:name="com.vivo.permissionmanager" />
-    </queries>
 
     <application
         android:name=".BalarmiApplication"
@@ -55,21 +49,5 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Monitors battery level during charging to alert when target charge is reached" />
         </service>
-
-        <receiver
-            android:name=".service.PowerConnectionReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".service.BootReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>

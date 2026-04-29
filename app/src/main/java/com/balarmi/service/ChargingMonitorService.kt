@@ -25,8 +25,8 @@ import com.balarmi.R
 import com.balarmi.alarm.AlarmController
 import com.balarmi.alarm.AlarmEvent
 import com.balarmi.alarm.AlarmEvents
-import com.balarmi.data.ServiceMode
 import com.balarmi.data.SettingsRepository
+import com.balarmi.state.MonitorState
 
 class ChargingMonitorService : Service() {
 
@@ -38,39 +38,36 @@ class ChargingMonitorService : Service() {
     private var lastBatteryPct: Int = -1
     private var lastIsCharging: Boolean = false
 
-    // Hysteresis: per-charging-session, in-memory only
-    private var armed = true
-    private var lastFiredPct = -1
+    // Arming rule: stays false until we observe pct < threshold at least once during this session.
+    // Prevents firing immediately when the user opens the app already at/above the target.
+    private var armed = false
 
-    // True if this run was started solely for a one-shot test, with no real monitoring context.
-    private var startedForTestOnly = false
+    private var currentAlarmIsTest = false
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
-            when (intent?.action) {
-                Intent.ACTION_BATTERY_CHANGED -> handleBatteryStatus(intent)
-                Intent.ACTION_POWER_DISCONNECTED -> handleUnplug()
-            }
+            if (intent?.action == Intent.ACTION_BATTERY_CHANGED) handleBatteryStatus(intent)
         }
     }
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        when (key) {
-            SettingsRepository.KEY_THRESHOLD -> {
-                armed = true
-                lastFiredPct = -1
-                if (lastBatteryPct >= 0 && lastIsCharging) evaluateThreshold(lastBatteryPct)
-            }
-            SettingsRepository.KEY_ENABLED -> {
-                if (!settings.current.monitoringEnabled) stopAllAndExit()
-            }
+        if (key == SettingsRepository.KEY_THRESHOLD && lastBatteryPct >= 0 && lastIsCharging) {
+            // Re-evaluate against current battery; respects the arming rule (raising threshold
+            // above current pct must not auto-arm — armed stays as it is until we see pct < threshold).
+            evaluateThreshold(lastBatteryPct)
         }
     }
 
     private val timeoutRunnable = Runnable {
         Log.i(TAG, "Alarm timeout (3 min) — auto-stopping")
+        val wasTest = currentAlarmIsTest
         stopAlarmInternal()
-        if (startedForTestOnly) stopAllAndExit()
+        if (!wasTest) stopAllAndExit()
+    }
+
+    private val unplugCloseRunnable = Runnable {
+        Log.i(TAG, "Unplug grace expired — exiting")
+        stopAllAndExit()
     }
 
     override fun onCreate() {
@@ -84,32 +81,25 @@ class ChargingMonitorService : Service() {
         startForegroundCompat(buildMonitorNotification(charging = false, pct = -1))
 
         when (intent?.action) {
-            ACTION_START -> startMonitoring()
+            ACTION_START, null -> startMonitoring()
             ACTION_TEST_ALARM -> {
-                if (!batteryReceiverRegistered) startedForTestOnly = true
+                currentAlarmIsTest = true
                 fireAlarm(isTest = true, pct = lastBatteryPct.takeIf { it >= 0 } ?: 100)
             }
             ACTION_STOP_ALARM -> {
+                val wasTest = currentAlarmIsTest
                 stopAlarmInternal()
-                if (startedForTestOnly) stopAllAndExit()
+                if (!wasTest) stopAllAndExit()
             }
             ACTION_STOP_MONITORING -> stopAllAndExit()
-            else -> {
-                // System restart of a sticky service
-                if (settings.current.monitoringEnabled) startMonitoring() else stopAllAndExit()
-            }
+            else -> startMonitoring()
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun startMonitoring() {
-        startedForTestOnly = false
         ensureBatteryReceiver()
         currentBatteryStatus()?.let { handleBatteryStatus(it) }
-        if (settings.current.serviceMode == ServiceMode.CHARGING_ONLY && !lastIsCharging) {
-            Log.i(TAG, "Started in CHARGING_ONLY mode but not charging — exiting")
-            stopAllAndExit()
-        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -117,9 +107,11 @@ class ChargingMonitorService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(timeoutRunnable)
+        handler.removeCallbacks(unplugCloseRunnable)
         unregisterBatteryReceiver()
         settings.unregisterListener(prefsListener)
         alarmController.stop()
+        MonitorState.reset()
     }
 
     // ---------- Foreground / notifications ----------
@@ -154,6 +146,12 @@ class ChargingMonitorService : Service() {
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val stopPi = PendingIntent.getService(
+            this,
+            2,
+            Intent(this, ChargingMonitorService::class.java).setAction(ACTION_STOP_MONITORING),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         return NotificationCompat.Builder(this, BalarmiApplication.CHANNEL_MONITOR)
             .setSmallIcon(R.drawable.ic_battery_alert)
             .setContentTitle(getString(R.string.monitor_notification_title))
@@ -161,6 +159,7 @@ class ChargingMonitorService : Service() {
             .setOngoing(true)
             .setSilent(true)
             .setContentIntent(tapPi)
+            .addAction(0, getString(R.string.notification_action_stop), stopPi)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
     }
@@ -209,10 +208,7 @@ class ChargingMonitorService : Service() {
 
     private fun ensureBatteryReceiver() {
         if (batteryReceiverRegistered) return
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_BATTERY_CHANGED)
-            addAction(Intent.ACTION_POWER_DISCONNECTED)
-        }
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(batteryReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
@@ -239,32 +235,34 @@ class ChargingMonitorService : Service() {
         val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
         val isCharging = plugged != 0
 
+        val wasCharging = lastIsCharging
         lastBatteryPct = pct
         lastIsCharging = isCharging
 
+        MonitorState.update(pct, isCharging)
         updateMonitorNotification(charging = isCharging, pct = pct)
 
-        if (isCharging) evaluateThreshold(pct)
+        if (isCharging) {
+            // Plugged in (or still plugged in): cancel any pending unplug-close.
+            handler.removeCallbacks(unplugCloseRunnable)
+            evaluateThreshold(pct)
+        } else if (wasCharging) {
+            // Just unplugged.
+            if (alarmController.isActive) stopAlarmInternal()
+            handler.removeCallbacks(unplugCloseRunnable)
+            handler.postDelayed(unplugCloseRunnable, UNPLUG_GRACE_MS)
+        }
     }
 
     private fun evaluateThreshold(pct: Int) {
         val threshold = settings.current.threshold
+        if (!armed && pct < threshold) {
+            armed = true
+        }
         if (armed && pct >= threshold) {
             armed = false
-            lastFiredPct = pct
             fireAlarm(isTest = false, pct = pct)
-        } else if (!armed && lastFiredPct >= 0 && pct <= lastFiredPct - REARM_DROP) {
-            armed = true
-            lastFiredPct = -1
         }
-    }
-
-    private fun handleUnplug() {
-        Log.i(TAG, "Power disconnected")
-        if (alarmController.isActive) stopAlarmInternal()
-        armed = true
-        lastFiredPct = -1
-        if (settings.current.serviceMode == ServiceMode.CHARGING_ONLY) stopAllAndExit()
     }
 
     // ---------- Alarm ----------
@@ -286,15 +284,18 @@ class ChargingMonitorService : Service() {
         handler.removeCallbacks(timeoutRunnable)
         alarmController.stop()
         cancelAlarmNotification()
+        currentAlarmIsTest = false
         AlarmEvents.emit(AlarmEvent.Stopped)
     }
 
     private fun stopAllAndExit() {
         handler.removeCallbacks(timeoutRunnable)
+        handler.removeCallbacks(unplugCloseRunnable)
         alarmController.stop()
         cancelAlarmNotification()
         AlarmEvents.emit(AlarmEvent.Stopped)
         unregisterBatteryReceiver()
+        MonitorState.reset()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -303,8 +304,8 @@ class ChargingMonitorService : Service() {
         private const val TAG = "ChargingMonitorService"
         private const val NOTIF_MONITOR_ID = 1
         private const val NOTIF_ALARM_ID = 2
-        private const val REARM_DROP = 3
         private const val ALARM_TIMEOUT_MS = 3 * 60 * 1000L
+        private const val UNPLUG_GRACE_MS = 2000L
 
         const val ACTION_START = "com.balarmi.action.START"
         const val ACTION_STOP_MONITORING = "com.balarmi.action.STOP_MONITORING"

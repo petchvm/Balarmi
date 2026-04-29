@@ -1,9 +1,6 @@
 package com.balarmi
 
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -23,12 +20,6 @@ class AlarmActivity : ComponentActivity() {
 
     private var isTest = false
 
-    private val unplugReceiver = object : BroadcastReceiver() {
-        override fun onReceive(ctx: Context?, intent: Intent?) {
-            if (intent?.action == Intent.ACTION_POWER_DISCONNECTED) finish()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -37,7 +28,8 @@ class AlarmActivity : ComponentActivity() {
 
         renderFromIntent(intent)
 
-        // Stop the activity when the service signals the alarm has stopped
+        // Service owns the unplug grace period and emits Stopped when it kills the alarm
+        // (either via STOP action, unplug, or 3-min timeout).
         lifecycleScope.launch {
             AlarmEvents.events.collect { event ->
                 if (event is AlarmEvent.Stopped) finish()
@@ -69,24 +61,6 @@ class AlarmActivity : ComponentActivity() {
                 )
             }
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (!isTest) {
-            val filter = IntentFilter(Intent.ACTION_POWER_DISCONNECTED)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(unplugReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("UnspecifiedRegisterReceiverFlag")
-                registerReceiver(unplugReceiver, filter)
-            }
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (!isTest) runCatching { unregisterReceiver(unplugReceiver) }
     }
 
     private fun setupShowWhenLocked() {

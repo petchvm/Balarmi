@@ -1,45 +1,46 @@
 package com.balarmi.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-private val LightColors = lightColorScheme(
-    primary = GreenPrimary,
-    primaryContainer = GreenContainer,
-    onPrimaryContainer = GreenOnContainer,
-    error = RedAlarm,
-    errorContainer = RedAlarmContainer,
-    onErrorContainer = RedAlarmOnContainer,
-)
-
-private val DarkColors = darkColorScheme(
-    primary = GreenContainer,
-    onPrimary = GreenOnContainer,
-    primaryContainer = GreenPrimary,
-    onPrimaryContainer = GreenContainer,
-    error = RedAlarm,
+private val GruvboxDark = darkColorScheme(
+    primary = GruvboxYellow,
+    onPrimary = GruvboxBg0,
+    primaryContainer = GruvboxBg3,
+    onPrimaryContainer = GruvboxYellow,
+    secondary = GruvboxOrange,
+    onSecondary = GruvboxBg0,
+    tertiary = GruvboxGreen,
+    onTertiary = GruvboxBg0,
+    background = GruvboxBg0,
+    onBackground = GruvboxFg1,
+    surface = GruvboxBg1,
+    onSurface = GruvboxFg1,
+    surfaceVariant = GruvboxBg3,
+    onSurfaceVariant = GruvboxGrey2,
+    outline = GruvboxGrey1,
+    outlineVariant = GruvboxBg5,
+    error = GruvboxRed,
+    onError = GruvboxBg0,
+    errorContainer = GruvboxErrorContainer,
+    onErrorContainer = GruvboxFg0,
 )
 
 @Composable
-fun BalarmiTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit,
-) {
-    val colors = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+fun BalarmiTheme(content: @Composable () -> Unit) {
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = false
+            controller.isAppearanceLightNavigationBars = false
         }
-        darkTheme -> DarkColors
-        else -> LightColors
     }
-    MaterialTheme(colorScheme = colors, content = content)
+    MaterialTheme(colorScheme = GruvboxDark, content = content)
 }

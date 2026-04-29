@@ -1,5 +1,7 @@
 package com.balarmi.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,13 +12,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -31,58 +40,66 @@ data class PermissionStates(
 )
 
 @Composable
-fun SetupChecklist(
+fun SetupBanner(
     permissions: PermissionStates,
-    autostartAcked: Boolean,
-    lockRecentsAcked: Boolean,
     onGrantNotifications: () -> Unit,
     onGrantFullScreen: () -> Unit,
     onGrantBatteryOpt: () -> Unit,
-    onOpenVivoAutoStart: () -> Unit,
-    onMarkLockRecentsAcked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(modifier = modifier) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                stringResource(R.string.checklist_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                stringResource(R.string.checklist_subtitle),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
+    val items = listOf(
+        Triple(R.string.checklist_notifications, permissions.notifications, onGrantNotifications),
+        Triple(R.string.checklist_full_screen, permissions.fullScreenIntent, onGrantFullScreen),
+        Triple(R.string.checklist_battery_opt, permissions.batteryOptExempt, onGrantBatteryOpt),
+    )
+    val total = items.size
+    val done = items.count { it.second }
+    if (done == total) return
 
-            ChecklistItem(
-                label = stringResource(R.string.checklist_notifications),
-                done = permissions.notifications,
-                onAction = onGrantNotifications,
-            )
-            ChecklistItem(
-                label = stringResource(R.string.checklist_full_screen),
-                done = permissions.fullScreenIntent,
-                onAction = onGrantFullScreen,
-            )
-            ChecklistItem(
-                label = stringResource(R.string.checklist_battery_opt),
-                done = permissions.batteryOptExempt,
-                onAction = onGrantBatteryOpt,
-            )
-            ChecklistItem(
-                label = stringResource(R.string.checklist_vivo_autostart),
-                done = autostartAcked,
-                onAction = onOpenVivoAutoStart,
-            )
-            ChecklistItem(
-                label = stringResource(R.string.checklist_lock_recents),
-                description = stringResource(R.string.checklist_lock_recents_desc),
-                done = lockRecentsAcked,
-                actionLabel = stringResource(R.string.checklist_done),
-                onAction = onMarkLockRecentsAcked,
-            )
+    var expanded by remember { mutableStateOf(true) }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+        ),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.setup_banner_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        stringResource(R.string.setup_banner_subtitle, done, total),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    Spacer(Modifier.height(8.dp))
+                    items.forEach { (labelRes, isDone, action) ->
+                        ChecklistItem(
+                            label = stringResource(labelRes),
+                            done = isDone,
+                            onAction = action,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -92,37 +109,27 @@ private fun ChecklistItem(
     label: String,
     done: Boolean,
     onAction: () -> Unit,
-    description: String? = null,
-    actionLabel: String? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = if (done) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            tint = if (done) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline,
         )
         Spacer(Modifier.width(12.dp))
-        Column(
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            if (description != null) {
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        )
         if (!done) {
             TextButton(onClick = onAction) {
-                Text(actionLabel ?: stringResource(R.string.checklist_grant))
+                Text(stringResource(R.string.checklist_grant))
             }
         }
     }

@@ -14,14 +14,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.balarmi.data.ServiceMode
 import com.balarmi.data.SettingsRepository
 import com.balarmi.service.ChargingMonitorService
+import com.balarmi.state.MonitorState
 import com.balarmi.ui.PermissionStates
 import com.balarmi.ui.SettingsScreen
 import com.balarmi.ui.theme.BalarmiTheme
 import com.balarmi.util.PermissionHelper
-import com.balarmi.util.VendorOptimizationHelper
 
 class MainActivity : ComponentActivity() {
 
@@ -48,26 +47,28 @@ class MainActivity : ComponentActivity() {
         permissionHelper = PermissionHelper(this)
         refreshPermissionStates()
 
+        // The user opened the app to start a charging session — bring up the monitor.
+        // The service is idempotent: subsequent startForegroundService calls just re-deliver onStartCommand.
+        ChargingMonitorService.start(this)
+
         setContent {
             BalarmiTheme {
                 val settingsState by remember { settings.observe() }
                     .collectAsState(initial = settings.current)
+                val monitor by MonitorState.state.collectAsState()
 
                 SettingsScreen(
                     settings = settingsState,
                     permissions = permissionStates,
+                    monitor = monitor,
                     ringtoneTitle = ringtoneTitleFor(settingsState.ringtoneUri),
-                    onMonitoringToggled = ::onMonitoringToggled,
                     onThresholdChanged = settings::setThreshold,
-                    onModeChanged = ::onModeChanged,
                     onVibrateToggled = settings::setVibrate,
                     onPickRingtone = ::launchRingtonePicker,
                     onTestAlarm = { ChargingMonitorService.testAlarm(this) },
                     onGrantNotifications = ::requestNotifications,
                     onGrantFullScreen = ::openFullScreenIntentSettings,
                     onGrantBatteryOpt = ::requestBatteryOptExempt,
-                    onOpenVivoAutoStart = ::openVivoAutoStart,
-                    onMarkLockRecentsAcked = { settings.setSetupLockRecentsAcked(true) },
                 )
             }
         }
@@ -129,26 +130,5 @@ class MainActivity : ComponentActivity() {
 
     private fun requestBatteryOptExempt() {
         startActivity(permissionHelper.batteryOptIntent())
-    }
-
-    private fun openVivoAutoStart() {
-        VendorOptimizationHelper.openAutoStartSettings(this)
-        settings.setSetupAutostartAcked(true)
-    }
-
-    private fun onMonitoringToggled(enabled: Boolean) {
-        settings.setMonitoringEnabled(enabled)
-        if (enabled) {
-            ChargingMonitorService.start(this)
-        } else {
-            ChargingMonitorService.stop(this)
-        }
-    }
-
-    private fun onModeChanged(mode: ServiceMode) {
-        settings.setServiceMode(mode)
-        if (settings.current.monitoringEnabled) {
-            ChargingMonitorService.start(this)
-        }
     }
 }
