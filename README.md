@@ -4,6 +4,8 @@ An Android app designed to monitor your device's battery level during charging a
 
 The app starts only when the user opens it and closes automatically when the cable is removed.
 
+<img src="assets/screenshot.jpg" alt="Balarmi" width="320">
+
 [Download](https://github.com/petchvm/Balarmi/releases/download/v2.0/Balarmi.apk)
 
 > ONLY WORKS WITH ANDROID 16+
