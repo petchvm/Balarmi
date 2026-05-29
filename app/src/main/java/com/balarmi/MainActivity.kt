@@ -5,6 +5,7 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -81,11 +82,24 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshPermissionStates() {
         permissionStates = PermissionStates(
-            notifications = permissionHelper.notificationsGranted,
-            fullScreenIntent = permissionHelper.canUseFullScreenIntent,
-            batteryOptExempt = permissionHelper.isIgnoringBatteryOptimization,
+            notifications = safePermissionProbe { permissionHelper.notificationsGranted },
+            fullScreenIntent = safePermissionProbe { permissionHelper.canUseFullScreenIntent },
+            batteryOptExempt = safePermissionProbe { permissionHelper.isIgnoringBatteryOptimization },
         )
     }
+
+    // Permission probes touch platform APIs whose availability and behaviour vary across Android
+    // versions and OEM builds. A single failing probe must never crash startup (this runs in
+    // onCreate/onResume), so degrade to "not granted" — the setup checklist will simply prompt
+    // the user — and log it for diagnosis. Catches Throwable on purpose to also absorb linkage
+    // errors like NoSuchMethodError from version/API mismatches.
+    private fun safePermissionProbe(probe: () -> Boolean): Boolean =
+        try {
+            probe()
+        } catch (t: Throwable) {
+            Log.w("MainActivity", "Permission probe failed; treating as not granted", t)
+            false
+        }
 
     private fun ringtoneTitleFor(uriStr: String?): String {
         val uri = uriStr?.let { runCatching { Uri.parse(it) }.getOrNull() }

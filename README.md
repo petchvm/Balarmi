@@ -8,4 +8,4 @@ The app starts only when the user opens it and closes automatically when the cab
 
 [Download](https://github.com/petchvm/Balarmi/releases/download/v2.0/Balarmi.apk)
 
-> ONLY WORKS WITH ANDROID 16+
+> Requires Android 8.0 (Oreo) or newer.

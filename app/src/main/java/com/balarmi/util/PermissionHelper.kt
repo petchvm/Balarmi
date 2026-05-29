@@ -19,7 +19,11 @@ class PermissionHelper(private val context: Context) {
         } else true
 
     val canUseFullScreenIntent: Boolean
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        // canUseFullScreenIntent() only exists on Android 14+ (API 34). On older versions the
+        // USE_FULL_SCREEN_INTENT permission is granted at install time and is always usable, so
+        // report true. The previous guard (API 31) invoked a non-existent method on Android
+        // 12/13, throwing NoSuchMethodError and crashing the app on launch.
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .canUseFullScreenIntent()
         } else true
